@@ -20,8 +20,8 @@ A **3D Lottery Draw Simulation** built with **Three.js, TypeScript, and GSAP**. 
 
 ```bash
 # Clone the repository
-git clone https://github.com/chalnicol/lottery-simulation.git
-cd lottery-simulation
+git clone https://github.com/chalnicol/lottery-sim-3d-react-ts.git
+cd lottery-sim-3d-react-ts
 
 # Install dependencies
 yarn install  # or npm install
