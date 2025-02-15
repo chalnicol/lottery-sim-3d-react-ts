@@ -3,14 +3,20 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as CANNON from "cannon-es";
 import { FontLoader } from "three/examples/jsm/loaders/FontLoader.js";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+
 import gsap from "gsap";
+import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 import Button from "./js/Button.ts";
 
-interface Select {
+interface Games {
 	id: number;
 	label: string;
 	value: number;
+	schedule: number[];
 }
+
+gsap.registerPlugin(MotionPathPlugin);
 
 export default class LotterySimulation {
 	private scene: THREE.Scene;
@@ -25,7 +31,7 @@ export default class LotterySimulation {
 	private ballBodies: CANNON.Body[] = [];
 	private drawnBalls: THREE.Group[] = [];
 	private mainPanelGroup = new THREE.Group();
-
+	private hoveredSelect: THREE.Group | null = null;
 	private totalBalls: number = 42;
 	private width = 7;
 	private height = 9;
@@ -34,17 +40,19 @@ export default class LotterySimulation {
 	private drawInterval: number = 5; //seconds
 	private maxDrawCount: number = 6;
 
+	private blinkTimer: number | undefined;
+
 	private timerPlanes: THREE.Mesh[] = [];
 	private totalPlanes = 30; // Number of planes
 	private fontURL: string =
 		"https://threejs.org/examples/fonts/helvetiker_bold.typeface.json";
 
-	private selectData: Select[] = [
-		{ id: 0, label: "Lotto", value: 42 },
-		{ id: 1, label: "Mega Lotto", value: 45 },
-		{ id: 2, label: "Super Lotto", value: 49 },
-		{ id: 3, label: "Grand Lotto", value: 55 },
-		{ id: 4, label: "Ultra Lotto", value: 58 },
+	private gamesData: Games[] = [
+		{ id: 0, label: "Lotto", value: 42, schedule: [2, 4, 6] },
+		{ id: 1, label: "Mega Lotto", value: 45, schedule: [1, 3, 5] },
+		{ id: 2, label: "Super Lotto", value: 49, schedule: [0, 2, 4] },
+		{ id: 3, label: "Grand Lotto", value: 55, schedule: [1, 3, 6] },
+		{ id: 4, label: "Ultra Lotto", value: 58, schedule: [0, 2, 5] },
 	];
 	private selects: THREE.Group[] = [];
 
@@ -99,7 +107,189 @@ export default class LotterySimulation {
 		setTimeout(() => {
 			this.createSelectGamePanel();
 			this.startLightingEffect();
+			// this.showSchedule();
 		}, 1000);
+	}
+
+	private getSchedule(): { label: string; value: number }[][] {
+		const schedule: { label: string; value: number }[][] = [];
+
+		for (let i = 0; i < 7; i++) {
+			schedule[i] = []; // Initialize each day as an empty array
+
+			for (let j = 0; j < this.gamesData.length; j++) {
+				if (this.gamesData[j].schedule.includes(i)) {
+					schedule[i].push({
+						label: this.gamesData[j].label,
+						value: this.gamesData[j].value,
+					});
+				}
+			}
+		}
+		return schedule;
+	}
+
+	private showSchedule() {
+		console.log(this.getSchedule());
+		const days: string[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+		const panelW = 1.5;
+		const panelH = 5.5;
+		const panelD = 0.05;
+
+		const schedule = this.getSchedule();
+		new FontLoader().load(this.fontURL, (font) => {
+			const titleGroup = new THREE.Group();
+			//create title..
+			const titleGeometry = new THREE.BoxGeometry(1.6 * 7 - 0.1, 1.2, 0.05);
+			const titleMaterial = new THREE.MeshBasicMaterial({
+				color: 0xffcc00,
+				transparent: true,
+				opacity: 0.5,
+				side: THREE.DoubleSide,
+			});
+			const title = new THREE.Mesh(titleGeometry, titleMaterial);
+
+			//create title text..
+			const titleTextGeometry = new TextGeometry("Lottery Schedule", {
+				font,
+				size: 0.35,
+				depth: 0,
+			});
+			const titleTextMaterial = new THREE.MeshBasicMaterial({
+				color: 0xfefefe,
+			});
+			const titleText = new THREE.Mesh(titleTextGeometry, titleTextMaterial);
+			titleText.position.z = 0.1;
+			titleText.position.y = -0.2;
+			titleText.position.x = -5;
+
+			titleGroup.add(title, titleText);
+			titleGroup.position.x = -(this.width / 2) - 6.4;
+			titleGroup.position.y = this.height / 2 + 0.9;
+
+			this.scene.add(titleGroup);
+
+			schedule.forEach((innerSched, i) => {
+				const schedGroup = new THREE.Group();
+
+				const containerGeometry = new RoundedBoxGeometry(
+					panelW,
+					panelH,
+					panelD,
+					5,
+					0.5
+				);
+				const containerMaterial = new THREE.MeshBasicMaterial({
+					color: 0xfefefe,
+					transparent: true,
+					opacity: 0.5,
+					depthWrite: false,
+
+					side: THREE.DoubleSide,
+				});
+				const container = new THREE.Mesh(
+					containerGeometry,
+					containerMaterial
+				);
+
+				const dayTextGeometry = new TextGeometry(days[i], {
+					font,
+					size: 0.3,
+					depth: 0,
+				});
+				const dayTextMaterial = new THREE.MeshBasicMaterial({
+					color: 0x3a3a3a,
+				});
+				const dayText = new THREE.Mesh(dayTextGeometry, dayTextMaterial);
+
+				dayTextGeometry.computeBoundingBox();
+				if (dayTextGeometry.boundingBox) {
+					const centerOffset =
+						-0.5 *
+						(dayTextGeometry.boundingBox.max.x -
+							dayTextGeometry.boundingBox.min.x);
+					dayText.position.set(centerOffset, 0.16, 0.1);
+				}
+
+				dayText.position.z = 0.05;
+				dayText.position.y = panelH / 2 - 0.7;
+
+				schedGroup.add(container, dayText);
+				schedGroup.position.set(
+					-(this.width / 2) + i * 1.6 - 1.6 * 7,
+					this.height / 2 - 2.75,
+					0
+				);
+				this.scene.add(schedGroup);
+
+				gsap.from(schedGroup.rotation, {
+					y: Math.PI / 2,
+					ease: "power1.out",
+					duration: 0.2,
+					delay: i * 0.1,
+				});
+
+				innerSched.forEach((game, j) => {
+					const gameGroup = new THREE.Group();
+
+					const squareGeometry = new THREE.PlaneGeometry(1.2, 1.2);
+					const squareMaterial = new THREE.MeshBasicMaterial({
+						color: 0xffde00,
+					});
+					const square = new THREE.Mesh(squareGeometry, squareMaterial);
+					square.position.z = 0.06;
+
+					const txt = `6/${game.value}`;
+					const gameTextGeometry = new TextGeometry(txt, {
+						font,
+						size: 0.23,
+						depth: 0,
+					});
+					const gameTextMaterial = new THREE.MeshBasicMaterial({
+						color: 0x3c3c3c,
+					});
+					const gameText = new THREE.Mesh(
+						gameTextGeometry,
+						gameTextMaterial
+					);
+
+					gameTextGeometry.computeBoundingBox();
+					if (gameTextGeometry.boundingBox) {
+						const centerOffset =
+							-0.5 *
+							(gameTextGeometry.boundingBox.max.x -
+								gameTextGeometry.boundingBox.min.x);
+						gameText.position.set(centerOffset, 0.16, 0.1);
+					}
+					gameText.position.z = 0.07;
+					gameText.position.y = -0.1;
+
+					gameGroup.add(square, gameText);
+
+					gameGroup.position.set(0, -j * 1.3 + 0.9, 0);
+
+					schedGroup.add(gameGroup);
+				});
+			});
+		});
+	}
+
+	private getColor(value: number): number {
+		switch (value) {
+			case 42:
+				return 0x99ff99; // Green
+			case 45:
+				return 0xffff00; // Yellow
+			case 49:
+				return 0xff99e6; // Magenta
+			case 55:
+				return 0x00ffff; // Cyan
+			case 58:
+				return 0xff9999; // Red
+			default:
+				return 0xffffff; // White
+		}
 	}
 
 	private createLighting() {
@@ -193,12 +383,48 @@ export default class LotterySimulation {
 			containerBorderMaterial
 		);
 		this.scene.add(containerBorderLines);
+
+		//create design panels..
+		const designPanelMaterial = new THREE.MeshBasicMaterial({
+			color: 0xffffff,
+			opacity: 0.3,
+			transparent: true,
+			depthWrite: false,
+			side: THREE.DoubleSide, // Ensures both sides are rendered only once
+		});
+		const designPanelGeometry = new THREE.PlaneGeometry(this.width, 3);
+		const designPanel1 = new THREE.Mesh(
+			designPanelGeometry,
+			designPanelMaterial
+		);
+		designPanel1.position.set(0, 0, -this.depth / 2);
+
+		// const designPanel2 = new THREE.Mesh(
+		// 	designPanelGeometry,
+		// 	designPanelMaterial
+		// );
+		// designPanel2.position.set(this.width / 2 - 0.5, 0, -this.depth / 2);
+
+		// const designPanel3 = new THREE.Mesh(
+		// 	designPanelGeometry,
+		// 	designPanelMaterial
+		// );
+		// designPanel3.rotation.y = Math.PI / 2;
+		// designPanel3.position.set(-this.width / 2, 0, -this.depth / 2 + 0.5);
+
+		// const designPanel4 = new THREE.Mesh(
+		// 	designPanelGeometry,
+		// 	designPanelMaterial
+		// );
+		// designPanel4.rotation.y = Math.PI / 2;
+		// designPanel4.position.set(this.width / 2, 0, this.depth / 2 - 0.5);
+
+		this.scene.add(designPanel1);
 	}
 
 	private createDisplayBox() {
 		const boxSize = 1.2;
-		const boxBottom = this.height / 2 + 0.61;
-		const displayGeometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize);
+		const displayGeometry = new THREE.BoxGeometry(boxSize, 2.4, boxSize);
 		const displayMaterial = new THREE.MeshBasicMaterial({
 			color: 0xffffff,
 			transparent: true,
@@ -220,7 +446,7 @@ export default class LotterySimulation {
 			displayGeometry,
 			materials as THREE.Material[]
 		);
-		displayBox.position.set(0, boxBottom, 0);
+		displayBox.position.set(0, this.height / 2, 0);
 		this.scene.add(displayBox);
 
 		// Create borders using LineSegments
@@ -230,7 +456,18 @@ export default class LotterySimulation {
 		}); // White borders
 		const displayBorderLines = new THREE.LineSegments(edges, borderMaterial);
 		displayBorderLines.position.copy(displayBox.position);
-		this.scene.add(displayBorderLines);
+
+		const centerEdges = new THREE.EdgesGeometry(
+			new THREE.PlaneGeometry(boxSize, boxSize)
+		);
+		const centerBorderLines = new THREE.LineSegments(
+			centerEdges,
+			borderMaterial
+		);
+		centerBorderLines.rotation.x = Math.PI / 2;
+		centerBorderLines.position.set(0, this.height / 2, 0);
+
+		this.scene.add(displayBorderLines, centerBorderLines);
 	}
 
 	private createBalls() {
@@ -300,13 +537,13 @@ export default class LotterySimulation {
 	}
 
 	private createButtons() {
-		const button1 = new Button(1, "START DRAW", false, 0x0000ff, 0xffffff);
+		const button1 = new Button(1, "START DRAW", false, 0x0066ff, 0xffffff);
 		button1.setVisible(false);
 		button1.setPosition(
 			new THREE.Vector3(this.width / 2 + 3.5, -this.height / 2 + 0.15, 1)
 		);
 
-		const button2 = new Button(2, "RESET", false, 0xff0000, 0xffffff);
+		const button2 = new Button(2, "RESET", false, 0xff3333, 0xffffff);
 		button2.setVisible(false);
 		button2.setPosition(
 			new THREE.Vector3(this.width / 2 + 3.5, -this.height / 2 + 0.15, -1)
@@ -400,7 +637,7 @@ export default class LotterySimulation {
 			const panelLabelGeometry = new TextGeometry("Select Lotto", {
 				font,
 				size: 0.3,
-				depth: 0.05,
+				depth: 0,
 			});
 			const panelLabelMaterial = new THREE.MeshBasicMaterial({
 				color: 0xfefefe,
@@ -409,7 +646,7 @@ export default class LotterySimulation {
 				panelLabelGeometry,
 				panelLabelMaterial
 			);
-			panelLabel.position.z = 0.05;
+			panelLabel.position.z = 0.1;
 			panelLabel.position.y = -0.1;
 			panelLabel.position.x = -2;
 
@@ -432,24 +669,24 @@ export default class LotterySimulation {
 					color: 0xffffff,
 					side: THREE.DoubleSide,
 					transparent: true,
-					opacity: 0.5,
+					opacity: 0.7,
 					//depthTest: false, // Disable depth testing for selection panel to appear on top of other objects
 				}); // Red color for selection panel
 				const selectPlane = new THREE.Mesh(selectGeometry, selectMaterial);
 				selectGroup.add(selectPlane);
 
 				//create label..
-				const text = `[6/${this.selectData[i].value}]  ${this.selectData[i].label}`;
+				const text = `[6/${this.gamesData[i].value}]  ${this.gamesData[i].label}`;
 				const labelGeometry = new TextGeometry(text, {
 					font,
 					size: 0.3,
-					depth: 0.05,
+					depth: 0,
 				});
 				const labelMaterial = new THREE.MeshBasicMaterial({
 					color: 0x1a1a1a,
 				});
 				const label = new THREE.Mesh(labelGeometry, labelMaterial);
-				label.position.z = 0.05;
+				label.position.z = 0.1;
 				label.position.x = -2;
 				label.position.y = -0.1;
 
@@ -511,47 +748,6 @@ export default class LotterySimulation {
 		}
 	}
 
-	private onMouseClick = (event: MouseEvent) => {
-		this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-		this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-		this.raycaster.setFromCamera(this.mouse, this.camera);
-
-		const intersects = this.raycaster.intersectObjects(
-			this.buttons.map((btn) => btn.getMesh()),
-			true
-		);
-
-		if (intersects.length > 0) {
-			const clickedObject = intersects[0].object.parent as THREE.Group; // Ensure it's a group
-			const clickedIndex = this.buttons.findIndex(
-				(btn) => btn.getMesh() === clickedObject
-			);
-
-			if (clickedIndex !== -1) {
-				// console.log("Clicked Button Index:", clickedIndex);
-				this.buttonClicked(clickedIndex); // Call your button click handler
-			}
-			return;
-		}
-
-		const selectIntersects = this.raycaster.intersectObjects(
-			this.selects,
-			true
-		);
-		if (selectIntersects.length > 0) {
-			const clickedSelect = selectIntersects[0].object.parent as THREE.Group; // Ensure it's a group
-			const clickedSelectIndex = this.selects.findIndex(
-				(select) => select === clickedSelect
-			);
-			if (clickedSelectIndex !== -1) {
-				// console.log("Clicked Select Index:", clickedSelectIndex);
-				this.selectButtonClicked(clickedSelectIndex); // Call your button click handler
-			}
-			return;
-		}
-	};
-
 	private buttonClicked(index: number) {
 		const button = this.buttons[index] as Button;
 		if (!button.isEnabled()) return;
@@ -562,14 +758,17 @@ export default class LotterySimulation {
 			case 0:
 				if (this.drawnBalls.length >= 6) {
 					this.resetAllBalls();
+					this.resetTimerPlanes();
+
 					setTimeout(() => {
 						this.startDraw();
-					}, 2000);
+					}, 1500);
 				} else {
 					if (!this.isDrawing) {
 						this.startDraw();
 					}
 				}
+
 				this.buttons.forEach((button) => {
 					button.enable(false);
 				});
@@ -577,7 +776,7 @@ export default class LotterySimulation {
 			//reset button
 			case 1:
 				this.resetAllBalls();
-
+				this.startLightingEffect();
 				this.buttons.forEach((button) => {
 					button.enable(false);
 					button.setVisible(false);
@@ -593,24 +792,55 @@ export default class LotterySimulation {
 
 	private selectButtonClicked(index: number) {
 		if (!this.selects[index]) return;
-		// Add your logic to handle button click event here
-		this.totalBalls = this.selectData[index].value;
-		this.buttons[0].enable();
+		// Add your logic to handle button click event here+
 
-		this.buttons[0].setVisible();
-		this.buttons[1].setVisible();
+		// const firstChild = this.selects[index]?.children[0] as THREE.Mesh;
+		// if (firstChild && firstChild.material) {
+		// 	(firstChild.material as THREE.MeshBasicMaterial).color.set(0xb3ffff);
+		// }
 
-		const firstChild = this.selects[index]?.children[0] as THREE.Mesh;
-		if (firstChild && firstChild.material) {
-			(firstChild.material as THREE.MeshBasicMaterial).color.set(0xffff6c);
-		}
+		gsap.to(this.selects[index].scale, {
+			x: 0.9,
+			y: 0.9,
+			repeat: 1,
+			yoyo: true,
+			ease: "power4.out",
+			duration: 0.05,
+			onComplete: () => {
+				this.totalBalls = this.gamesData[index].value;
+				this.buttons[0].enable();
+
+				this.buttons[0].setVisible();
+				this.buttons[1].setVisible();
+				this.resetAllBalls();
+				this.removeSelectPanel();
+			},
+		});
 
 		// const secondChild = this.selects[index]?.children[1] as THREE.Mesh;
 		// if (secondChild && secondChild.material) {
 		// 	(secondChild.material as THREE.MeshBasicMaterial).color.set(0x9c9c9c);
 		// }
-		this.resetAllBalls();
-		this.removeSelectPanel();
+	}
+
+	private selectButtonHover(index: number) {
+		if (!this.selects[index]) return;
+
+		if (this.hoveredSelect !== this.selects[index]) {
+			const hoveredChild = this.hoveredSelect?.children[0] as THREE.Mesh;
+			if (hoveredChild && hoveredChild.material) {
+				(hoveredChild.material as THREE.MeshBasicMaterial).color.set(
+					0xffff4d
+				);
+			}
+		}
+
+		this.hoveredSelect = this.selects[index];
+		// Add your logic to handle button click event here
+		const firstChild = this.selects[index]?.children[0] as THREE.Mesh;
+		if (firstChild && firstChild.material) {
+			(firstChild.material as THREE.MeshBasicMaterial).color.set(0xffff6c);
+		}
 	}
 
 	private removeSelectPanel() {
@@ -630,6 +860,37 @@ export default class LotterySimulation {
 			this.scene.remove(this.mainPanelGroup);
 			this.selects = [];
 		}, 1000);
+	}
+
+	private getArcPoints(
+		start: THREE.Vector3,
+		end: THREE.Vector3,
+		numPoints = 4
+	): THREE.Vector3[] {
+		const midX = (start.x + end.x) / 2;
+		const midY = Math.max(start.y, end.y) + 2; // Raise the midpoint for an arc effect
+		const midZ = (start.z + end.z) / 2;
+
+		const points: THREE.Vector3[] = [];
+
+		for (let i = 0; i <= numPoints; i++) {
+			const t = i / numPoints; // Normalize between 0 and 1
+			const x =
+				(1 - t) * (1 - t) * start.x +
+				2 * (1 - t) * t * midX +
+				t * t * end.x;
+			const y =
+				(1 - t) * (1 - t) * start.y +
+				2 * (1 - t) * t * midY +
+				t * t * end.y;
+			const z =
+				(1 - t) * (1 - t) * start.z +
+				2 * (1 - t) * t * midZ +
+				t * t * end.z;
+			points.push(new THREE.Vector3(x, y, z));
+		}
+
+		return points;
 	}
 
 	private drawBall = () => {
@@ -662,50 +923,53 @@ export default class LotterySimulation {
 		const drawnXPosition: number =
 			this.drawnBalls.length * 1.4 - this.width / 2;
 
+		const pointA = new THREE.Vector3(0, this.height / 2 + 2.6, 0);
+		const pointB = new THREE.Vector3(
+			drawnXPosition,
+			this.height / 2 + 0.6,
+			this.depth / 2 + 2
+		);
+		const pathPoints = this.getArcPoints(pointA, pointB, 7);
+
 		gsap.to(nearestBall.position, {
 			x: 0,
 			y: this.height / 2 + 0.6,
 			z: 0,
-			duration: 0.2,
+			duration: 0.3,
 			ease: "power4.out",
 			onComplete: () => {
-				setTimeout(() => {
-					const timeline = gsap.timeline();
+				const timeline = gsap.timeline();
 
-					timeline
-						.addLabel("init")
-						.to(
-							nearestBall.position,
-							{ y: "+=3", duration: 0.3, ease: "sine.in" },
-							"init"
-						)
-						.to(
-							nearestBall.position,
-							{ y: "+=1", z: "+=1", duration: 0.2, ease: "sine.out" },
-							"init+=0.2"
-						)
-						.to(
-							nearestBall.position,
-							{ y: "-=2", z: "+=2", duration: 0.2, ease: "sine.out" },
-							"init+=0.4"
-						)
-						.to(
-							nearestBall.rotation,
-							{ x: -0.7, y: 0, z: 0, duration: 1, ease: "power2.out" },
-							"init+=0.3"
-						)
-						.to(
-							nearestBall.position,
-							{
-								x: drawnXPosition,
-								y: -this.height / 2 + 0.6,
-								z: this.depth / 2 + 2,
-								duration: 0.6,
-								ease: "bounce.out",
-							},
-							"init+=0.6"
-						);
-				}, 2000);
+				timeline.to(nearestBall.rotation, {
+					x: -0.7,
+					y: 0,
+					z: 0,
+					ease: "power1.inOut",
+					duration: 0.8,
+				});
+				timeline.to(nearestBall.position, {
+					x: 0,
+					y: this.height / 2 + 2.6,
+					z: 0,
+					duration: 0.1, // Adjust speed
+					ease: "power1.in",
+				});
+				pathPoints.forEach((point) => {
+					timeline.to(nearestBall.position, {
+						x: point.x,
+						y: point.y,
+						z: point.z,
+						duration: 0.03, // Adjust speed
+						ease: "sine.out",
+					});
+				});
+
+				// Drop effect when reaching Point B
+				timeline.to(nearestBall.position, {
+					y: -this.height / 2 + 0.6, // Final drop position
+					duration: 1,
+					ease: "bounce.out",
+				});
 			},
 		});
 
@@ -740,6 +1004,7 @@ export default class LotterySimulation {
 		this.buttons[1].enable();
 
 		this.buttons[0].setLabel("DRAW AGAIN");
+		this.blinkTimerPlanes();
 	}
 
 	private resetAllBalls() {
@@ -776,10 +1041,105 @@ export default class LotterySimulation {
 	}
 
 	private resetTimerPlanes() {
+		clearInterval(this.blinkTimer);
 		this.timerPlanes.forEach((plane) => {
 			(plane.material as THREE.MeshBasicMaterial).color.set(0x333333); // Dim color
 		});
 	}
+
+	private blinkTimerPlanes() {
+		let blink = false;
+		clearInterval(this.blinkTimer);
+
+		this.blinkTimer = setInterval(() => {
+			this.timerPlanes.forEach((plane) => {
+				(plane.material as THREE.MeshBasicMaterial).color.set(
+					blink ? 0x333333 : 0xffcc00
+				);
+			});
+			blink = !blink;
+		}, 500);
+	}
+
+	private onMouseClick = (event: MouseEvent) => {
+		this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+		this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+		this.raycaster.setFromCamera(this.mouse, this.camera);
+
+		const intersects = this.raycaster.intersectObjects(
+			this.buttons.map((btn) => btn.getMesh()),
+			true
+		);
+
+		if (intersects.length > 0) {
+			const clickedObject = intersects[0].object.parent as THREE.Group; // Ensure it's a group
+			const clickedIndex = this.buttons.findIndex(
+				(btn) => btn.getMesh() === clickedObject
+			);
+
+			if (clickedIndex !== -1) {
+				// console.log("Clicked Button Index:", clickedIndex);
+				this.buttonClicked(clickedIndex); // Call your button click handler
+			}
+			return;
+		}
+
+		const selectIntersects = this.raycaster.intersectObjects(
+			this.selects,
+			true
+		);
+		if (selectIntersects.length > 0) {
+			const clickedSelect = selectIntersects[0].object.parent as THREE.Group; // Ensure it's a group
+			const clickedSelectIndex = this.selects.findIndex(
+				(select) => select === clickedSelect
+			);
+			if (clickedSelectIndex !== -1) {
+				console.log("Clicked Select Index:", clickedSelectIndex);
+				this.selectButtonClicked(clickedSelectIndex); // Call your button click handler
+			}
+			return;
+		}
+	};
+
+	private onMouseMove = (event: MouseEvent) => {
+		this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+		this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+		this.raycaster.setFromCamera(this.mouse, this.camera);
+
+		// Check for hover on selects
+		const selectIntersects = this.raycaster.intersectObjects(
+			this.selects,
+			true
+		);
+
+		if (selectIntersects.length > 0) {
+			const clickedSelect = selectIntersects[0].object.parent as THREE.Group; // Ensure it's a group
+			const clickedSelectIndex = this.selects.findIndex(
+				(select) => select === clickedSelect
+			);
+			if (clickedSelectIndex !== -1) {
+				// console.log("Clicked Select Index:", clickedSelectIndex);
+				this.selectButtonHover(clickedSelectIndex);
+			} else {
+				//..
+			}
+			return;
+		} else {
+			if (this.hoveredSelect) {
+				const hoveredChild = this.hoveredSelect?.children[0] as THREE.Mesh;
+				if (hoveredChild && hoveredChild.material) {
+					(hoveredChild.material as THREE.MeshBasicMaterial).color.set(
+						0xffffff
+					);
+				}
+				this.hoveredSelect = null;
+			}
+		}
+	};
+
+	// Reset function to restore default appearance
 
 	private setupEventListeners() {
 		window.addEventListener("resize", () => {
@@ -788,10 +1148,12 @@ export default class LotterySimulation {
 			this.renderer.setSize(window.innerWidth, window.innerHeight);
 		});
 		window.addEventListener("click", this.onMouseClick);
+		window.addEventListener("mousemove", this.onMouseMove);
 	}
 
 	public destroy() {
 		window.removeEventListener("click", this.onMouseClick);
+		window.removeEventListener("mousemove", this.onMouseMove);
 	}
 
 	private animate = () => {
