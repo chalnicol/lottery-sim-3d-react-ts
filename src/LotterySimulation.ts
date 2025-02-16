@@ -30,8 +30,6 @@ export default class LotterySimulation {
 	private balls: THREE.Group[] = [];
 	private ballBodies: CANNON.Body[] = [];
 	private drawnBalls: THREE.Group[] = [];
-	private mainPanelGroup = new THREE.Group();
-	private hoveredSelect: THREE.Group | null = null;
 	private totalBalls: number = 42;
 	private width = 7;
 	private height = 9;
@@ -39,9 +37,7 @@ export default class LotterySimulation {
 	private isDrawing: boolean = false;
 	private drawInterval: number = 5; //seconds
 	private maxDrawCount: number = 6;
-
 	private blinkTimer: number | undefined;
-
 	private timerPlanes: THREE.Mesh[] = [];
 	private totalPlanes = 30; // Number of planes
 	private fontURL: string =
@@ -54,7 +50,11 @@ export default class LotterySimulation {
 		{ id: 3, label: "Grand Lotto", value: 55, schedule: [1, 3, 6] },
 		{ id: 4, label: "Ultra Lotto", value: 58, schedule: [0, 2, 5] },
 	];
+
+	private hoveredSelect: THREE.Group | null = null;
 	private selects: THREE.Group[] = [];
+	private selectPanelGroup: THREE.Group[] = [];
+	private schedulePanelGroup: THREE.Group[] = [];
 
 	constructor(canvas: HTMLCanvasElement) {
 		this.scene = new THREE.Scene();
@@ -107,8 +107,10 @@ export default class LotterySimulation {
 		setTimeout(() => {
 			this.createSelectGamePanel();
 			this.startLightingEffect();
-			// this.showSchedule();
 		}, 1000);
+		setTimeout(() => {
+			this.createSchedule();
+		}, 1500);
 	}
 
 	private getSchedule(): { label: string; value: number }[][] {
@@ -129,19 +131,25 @@ export default class LotterySimulation {
 		return schedule;
 	}
 
-	private showSchedule() {
-		console.log(this.getSchedule());
+	private createSchedule() {
+		// console.log(this.getSchedule());
 		const days: string[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-		const panelW = 1.5;
+		const panelW = 11;
 		const panelH = 5.5;
 		const panelD = 0.05;
+		const panelSpacing = 0.1;
+
+		const gap = 1;
+		const day = new Date().getDay();
+
+		const subPanelW = (panelW + panelSpacing) / 7 - panelSpacing;
 
 		const schedule = this.getSchedule();
 		new FontLoader().load(this.fontURL, (font) => {
 			const titleGroup = new THREE.Group();
 			//create title..
-			const titleGeometry = new THREE.BoxGeometry(1.6 * 7 - 0.1, 1.2, 0.05);
+			const titleGeometry = new THREE.BoxGeometry(panelW, 1.2, 0.05);
 			const titleMaterial = new THREE.MeshBasicMaterial({
 				color: 0xffcc00,
 				transparent: true,
@@ -160,32 +168,32 @@ export default class LotterySimulation {
 				color: 0xfefefe,
 			});
 			const titleText = new THREE.Mesh(titleTextGeometry, titleTextMaterial);
-			titleText.position.z = 0.1;
+			titleText.position.z = 0.05;
 			titleText.position.y = -0.2;
-			titleText.position.x = -5;
+			titleText.position.x = -panelW / 2 + 0.5;
 
 			titleGroup.add(title, titleText);
-			titleGroup.position.x = -(this.width / 2) - 6.4;
-			titleGroup.position.y = this.height / 2 + 0.9;
+			titleGroup.position.x = -this.width / 2 - panelW / 2 - gap;
+			titleGroup.position.y = this.height / 2 + 0.2;
 
 			this.scene.add(titleGroup);
+			this.schedulePanelGroup.push(titleGroup);
 
 			schedule.forEach((innerSched, i) => {
 				const schedGroup = new THREE.Group();
 
 				const containerGeometry = new RoundedBoxGeometry(
-					panelW,
+					subPanelW,
 					panelH,
 					panelD,
 					5,
 					0.5
 				);
 				const containerMaterial = new THREE.MeshBasicMaterial({
-					color: 0xfefefe,
+					color: day == i ? 0xccffe6 : 0xffffff,
 					transparent: true,
-					opacity: 0.5,
-					depthWrite: false,
-
+					opacity: 0.7,
+					// depthWrite: false,
 					side: THREE.DoubleSide,
 				});
 				const container = new THREE.Mesh(
@@ -215,27 +223,35 @@ export default class LotterySimulation {
 				dayText.position.z = 0.05;
 				dayText.position.y = panelH / 2 - 0.7;
 
+				const xPos =
+					-this.width / 2 -
+					panelW -
+					gap +
+					subPanelW / 2 +
+					i * (subPanelW + panelSpacing);
+
 				schedGroup.add(container, dayText);
-				schedGroup.position.set(
-					-(this.width / 2) + i * 1.6 - 1.6 * 7,
-					this.height / 2 - 2.75,
-					0
-				);
+				schedGroup.position.set(xPos, this.height / 2 - 3.4, 0);
+
 				this.scene.add(schedGroup);
+				this.schedulePanelGroup.push(schedGroup);
 
 				gsap.from(schedGroup.rotation, {
 					y: Math.PI / 2,
 					ease: "power1.out",
 					duration: 0.2,
-					delay: i * 0.1,
+					delay: i * 0.06,
 				});
 
 				innerSched.forEach((game, j) => {
 					const gameGroup = new THREE.Group();
 
-					const squareGeometry = new THREE.PlaneGeometry(1.2, 1.2);
+					const squareGeometry = new THREE.PlaneGeometry(
+						subPanelW * 0.8,
+						subPanelW * 0.8
+					);
 					const squareMaterial = new THREE.MeshBasicMaterial({
-						color: 0xffde00,
+						color: 0x1c1c1c,
 					});
 					const square = new THREE.Mesh(squareGeometry, squareMaterial);
 					square.position.z = 0.06;
@@ -243,11 +259,11 @@ export default class LotterySimulation {
 					const txt = `6/${game.value}`;
 					const gameTextGeometry = new TextGeometry(txt, {
 						font,
-						size: 0.23,
+						size: 0.28,
 						depth: 0,
 					});
 					const gameTextMaterial = new THREE.MeshBasicMaterial({
-						color: 0x3c3c3c,
+						color: 0xfefefe,
 					});
 					const gameText = new THREE.Mesh(
 						gameTextGeometry,
@@ -267,29 +283,12 @@ export default class LotterySimulation {
 
 					gameGroup.add(square, gameText);
 
-					gameGroup.position.set(0, -j * 1.3 + 0.9, 0);
+					gameGroup.position.set(0, -j * 1.4 + 1.1, 0);
 
 					schedGroup.add(gameGroup);
 				});
 			});
 		});
-	}
-
-	private getColor(value: number): number {
-		switch (value) {
-			case 42:
-				return 0x99ff99; // Green
-			case 45:
-				return 0xffff00; // Yellow
-			case 49:
-				return 0xff99e6; // Magenta
-			case 55:
-				return 0x00ffff; // Cyan
-			case 58:
-				return 0xff9999; // Red
-			default:
-				return 0xffffff; // White
-		}
 	}
 
 	private createLighting() {
@@ -623,24 +622,25 @@ export default class LotterySimulation {
 		new FontLoader().load(this.fontURL, (font) => {
 			console.log("loaded..");
 
+			const titleGroup = new THREE.Group();
 			//create main panel..
 			const panelGeometry = new THREE.BoxGeometry(5, 1, 0.1);
 			const panelMaterial = new THREE.MeshBasicMaterial({
-				color: 0xff9900,
+				color: 0xffcc00,
 				side: THREE.DoubleSide,
 				transparent: true,
 				opacity: 0.5,
 				//depthTest: false, // Disable depth testing for selection panel to appear on top of other objects
 			}); // Black color for selection panel
 			const panel = new THREE.Mesh(panelGeometry, panelMaterial);
-			this.mainPanelGroup.add(panel);
+			titleGroup.add(panel);
 			const panelLabelGeometry = new TextGeometry("Select Lotto", {
 				font,
 				size: 0.3,
 				depth: 0,
 			});
 			const panelLabelMaterial = new THREE.MeshBasicMaterial({
-				color: 0xfefefe,
+				color: 0xffffff,
 			});
 			const panelLabel = new THREE.Mesh(
 				panelLabelGeometry,
@@ -650,15 +650,12 @@ export default class LotterySimulation {
 			panelLabel.position.y = -0.1;
 			panelLabel.position.x = -2;
 
-			this.mainPanelGroup.add(panelLabel);
+			titleGroup.add(panelLabel);
 
-			this.mainPanelGroup.position.set(
-				this.width / 2 + 4,
-				this.height / 2 + 0.3,
-				0
-			);
+			titleGroup.position.set(this.width / 2 + 4, this.height / 2 + 0.3, 0);
 
-			this.scene.add(this.mainPanelGroup);
+			this.scene.add(titleGroup);
+			this.selectPanelGroup.push(titleGroup);
 
 			for (let i = 0; i < 5; i++) {
 				const selectGroup = new THREE.Group();
@@ -686,9 +683,7 @@ export default class LotterySimulation {
 					color: 0x1a1a1a,
 				});
 				const label = new THREE.Mesh(labelGeometry, labelMaterial);
-				label.position.z = 0.1;
-				label.position.x = -2;
-				label.position.y = -0.1;
+				label.position.set(-2, -0.1, 0.1);
 
 				selectGroup.add(label);
 
@@ -700,6 +695,7 @@ export default class LotterySimulation {
 
 				this.scene.add(selectGroup);
 				this.selects.push(selectGroup);
+				this.selectPanelGroup.push(selectGroup);
 			}
 			//animate..
 			this.selects.forEach((select, i) => {
@@ -782,7 +778,8 @@ export default class LotterySimulation {
 					button.setVisible(false);
 				});
 				this.buttons[0].setLabel("START DRAW");
-				setTimeout(() => this.createSelectGamePanel(), 1000);
+				setTimeout(() => this.showSelectPanel(), 1000);
+				setTimeout(() => this.showSchedule(), 1500);
 
 				break;
 			default:
@@ -792,13 +789,7 @@ export default class LotterySimulation {
 
 	private selectButtonClicked(index: number) {
 		if (!this.selects[index]) return;
-		// Add your logic to handle button click event here+
-
-		// const firstChild = this.selects[index]?.children[0] as THREE.Mesh;
-		// if (firstChild && firstChild.material) {
-		// 	(firstChild.material as THREE.MeshBasicMaterial).color.set(0xb3ffff);
-		// }
-
+		console.log("selectButtonClicked");
 		gsap.to(this.selects[index].scale, {
 			x: 0.9,
 			y: 0.9,
@@ -813,14 +804,10 @@ export default class LotterySimulation {
 				this.buttons[0].setVisible();
 				this.buttons[1].setVisible();
 				this.resetAllBalls();
-				this.removeSelectPanel();
+				this.showSelectPanel(false);
+				this.showSchedule(false);
 			},
 		});
-
-		// const secondChild = this.selects[index]?.children[1] as THREE.Mesh;
-		// if (secondChild && secondChild.material) {
-		// 	(secondChild.material as THREE.MeshBasicMaterial).color.set(0x9c9c9c);
-		// }
 	}
 
 	private selectButtonHover(index: number) {
@@ -830,7 +817,7 @@ export default class LotterySimulation {
 			const hoveredChild = this.hoveredSelect?.children[0] as THREE.Mesh;
 			if (hoveredChild && hoveredChild.material) {
 				(hoveredChild.material as THREE.MeshBasicMaterial).color.set(
-					0xffff4d
+					0xffffff
 				);
 			}
 		}
@@ -839,27 +826,89 @@ export default class LotterySimulation {
 		// Add your logic to handle button click event here
 		const firstChild = this.selects[index]?.children[0] as THREE.Mesh;
 		if (firstChild && firstChild.material) {
-			(firstChild.material as THREE.MeshBasicMaterial).color.set(0xffff6c);
+			(firstChild.material as THREE.MeshBasicMaterial).color.set(0xccffe6);
 		}
 	}
 
-	private removeSelectPanel() {
-		this.selects.forEach((select, i) => {
-			gsap.to(select.scale, {
-				x: 0,
-				y: 0,
-				ease: "elastic.in(1, 0.6)",
-				duration: 0.8,
-				delay: (this.selects.length - 1 - i) * 0.1,
-				onComplete: () => {
-					this.scene.remove(select);
-				},
+	private showSelectPanel(show: boolean = true) {
+		if (show) {
+			//..
+			this.selectPanelGroup[0].visible = true;
+			this.selects.forEach((select, i) => {
+				select.visible = true;
+				gsap.fromTo(
+					select.scale,
+					{ x: 0, y: 0 },
+					{
+						x: 1,
+						y: 1,
+						ease: "elastic.out(1, 0.6)",
+						duration: 0.8,
+						delay: i * 0.1,
+					}
+				);
 			});
-		});
-		setTimeout(() => {
-			this.scene.remove(this.mainPanelGroup);
-			this.selects = [];
-		}, 1000);
+		} else {
+			let count: number = 0;
+			this.selects.forEach((select, i) => {
+				gsap.to(select.scale, {
+					x: 0,
+					y: 0,
+					ease: "elastic.in(1, 0.6)",
+					duration: 0.8,
+					delay: (this.selects.length - 1 - i) * 0.1,
+					onComplete: () => {
+						count++;
+						select.visible = false;
+						if (count === this.selects.length) {
+							this.selectPanelGroup[0].visible = false;
+						}
+					},
+				});
+			});
+		}
+	}
+
+	private showSchedule(show: boolean = true) {
+		//..
+		if (show) {
+			//todo..
+			this.schedulePanelGroup[0].visible = true;
+			const dates = this.schedulePanelGroup.slice(
+				1,
+				this.schedulePanelGroup.length
+			);
+			dates.forEach((date, i) => {
+				gsap.to(date.rotation, {
+					y: 0,
+					ease: "power2.out",
+					duration: 0.1,
+					delay: i * 0.05,
+				});
+				date.visible = true;
+			});
+		} else {
+			const dates = this.schedulePanelGroup.slice(
+				1,
+				this.schedulePanelGroup.length
+			);
+			let count = 0;
+			dates.forEach((date, i) => {
+				gsap.to(date.rotation, {
+					y: Math.PI / 2,
+					ease: "power1.out",
+					duration: 0.2,
+					delay: i * 0.1,
+					onComplete: () => {
+						count++;
+						date.visible = false;
+						if (count === dates.length) {
+							this.schedulePanelGroup[0].visible = false;
+						}
+					},
+				});
+			});
+		}
 	}
 
 	private getArcPoints(
