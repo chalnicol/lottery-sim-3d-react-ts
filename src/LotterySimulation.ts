@@ -140,7 +140,7 @@ export default class LotterySimulation {
 		const panelD = 0.05;
 		const panelSpacing = 0.1;
 
-		const gap = 1;
+		const gap = 1.5;
 		const day = new Date().getDay();
 
 		const subPanelW = (panelW + panelSpacing) / 7 - panelSpacing;
@@ -251,7 +251,7 @@ export default class LotterySimulation {
 						subPanelW * 0.8
 					);
 					const squareMaterial = new THREE.MeshBasicMaterial({
-						color: 0x1c1c1c,
+						color: 0x2e2e2e,
 					});
 					const square = new THREE.Mesh(squareGeometry, squareMaterial);
 					square.position.z = 0.06;
@@ -843,8 +843,8 @@ export default class LotterySimulation {
 						x: 1,
 						y: 1,
 						ease: "elastic.out(1, 0.6)",
-						duration: 0.8,
-						delay: i * 0.1,
+						duration: 0.5,
+						delay: i * 0.05,
 					}
 				);
 			});
@@ -855,8 +855,8 @@ export default class LotterySimulation {
 					x: 0,
 					y: 0,
 					ease: "elastic.in(1, 0.6)",
-					duration: 0.8,
-					delay: (this.selects.length - 1 - i) * 0.1,
+					duration: 0.4,
+					delay: (this.selects.length - 1 - i) * 0.05,
 					onComplete: () => {
 						count++;
 						select.visible = false;
@@ -911,31 +911,26 @@ export default class LotterySimulation {
 		}
 	}
 
-	private getArcPoints(
+	private createJumpPath(
 		start: THREE.Vector3,
 		end: THREE.Vector3,
-		numPoints = 4
+		height: number,
+		numPoints: number = 30
 	): THREE.Vector3[] {
-		const midX = (start.x + end.x) / 2;
-		const midY = Math.max(start.y, end.y) + 2; // Raise the midpoint for an arc effect
-		const midZ = (start.z + end.z) / 2;
-
 		const points: THREE.Vector3[] = [];
 
+		// Midpoint between start and end
+
 		for (let i = 0; i <= numPoints; i++) {
-			const t = i / numPoints; // Normalize between 0 and 1
-			const x =
-				(1 - t) * (1 - t) * start.x +
-				2 * (1 - t) * t * midX +
-				t * t * end.x;
-			const y =
-				(1 - t) * (1 - t) * start.y +
-				2 * (1 - t) * t * midY +
-				t * t * end.y;
-			const z =
-				(1 - t) * (1 - t) * start.z +
-				2 * (1 - t) * t * midZ +
-				t * t * end.z;
+			const t = i / numPoints; // Normalized progress (0 to 1)
+
+			// Interpolate X and Z linearly (horizontal movement)
+			const x = THREE.MathUtils.lerp(start.x, end.x, t);
+			const z = THREE.MathUtils.lerp(start.z, end.z, t);
+
+			// Quadratic formula for height (parabolic arc)
+			const y = start.y + height * Math.sin(t * Math.PI); // Half-oval jump
+
 			points.push(new THREE.Vector3(x, y, z));
 		}
 
@@ -975,10 +970,10 @@ export default class LotterySimulation {
 		const pointA = new THREE.Vector3(0, this.height / 2 + 2.6, 0);
 		const pointB = new THREE.Vector3(
 			drawnXPosition,
-			this.height / 2 + 0.6,
-			this.depth / 2 + 2
+			this.height / 2 + 2.6,
+			this.depth / 2 + 2.5
 		);
-		const pathPoints = this.getArcPoints(pointA, pointB, 7);
+		const pathPoints = this.createJumpPath(pointA, pointB, 3);
 
 		gsap.to(nearestBall.position, {
 			x: 0,
@@ -987,38 +982,92 @@ export default class LotterySimulation {
 			duration: 0.3,
 			ease: "power4.out",
 			onComplete: () => {
-				const timeline = gsap.timeline();
+				const tl = gsap.timeline({ delay: 0.5 });
 
-				timeline.to(nearestBall.rotation, {
-					x: -0.7,
-					y: 0,
-					z: 0,
-					ease: "power1.inOut",
-					duration: 0.8,
-				});
-				timeline.to(nearestBall.position, {
-					x: 0,
-					y: this.height / 2 + 2.6,
-					z: 0,
-					duration: 0.1, // Adjust speed
-					ease: "power1.in",
-				});
-				pathPoints.forEach((point) => {
-					timeline.to(nearestBall.position, {
-						x: point.x,
-						y: point.y,
-						z: point.z,
-						duration: 0.03, // Adjust speed
-						ease: "sine.out",
-					});
-				});
+				tl.addLabel("main")
 
-				// Drop effect when reaching Point B
-				timeline.to(nearestBall.position, {
-					y: -this.height / 2 + 0.6, // Final drop position
-					duration: 1,
-					ease: "bounce.out",
-				});
+					// Initial lift (smooth ease-out)
+					.to(
+						nearestBall.position,
+						{
+							x: 0,
+							y: "+=2",
+							z: 0,
+							ease: "power2.inOut", // Smooth acceleration
+							duration: 0.25, // Slightly longer for natural lift
+						},
+						"main"
+					)
+
+					// Rotation during lift
+					.to(
+						nearestBall.rotation,
+						{
+							x: -0.7,
+							y: 0,
+							z: 0,
+							ease: "linear",
+							duration: 1, // Syncs better with the arc
+						},
+						"main"
+					)
+
+					// Smooth jump along motion path
+					.to(
+						nearestBall.position,
+						{
+							duration: 0.3, // Longer for a better motion arc
+							ease: "linear", // More natural easing for arc motion
+							motionPath: {
+								path: pathPoints,
+								autoRotate: true, // Aligns object along the path
+							},
+						},
+						"main+=0.15" // Keep slight delay before jump path
+					)
+
+					// Final drop with bounce
+					.to(
+						nearestBall.position,
+						{
+							y: -this.height / 2 + 0.6, // Final landing position
+							duration: 0.7, // Keeps it balanced
+							ease: "bounce.out", // Natural bounce effect
+						},
+						"main+=0.35" // Starts right after the jump path finishes
+					);
+
+				// const timeline = gsap.timeline();
+
+				// timeline
+				// 	.to(nearestBall.rotation, {
+				// 		x: -0.7,
+				// 		y: 0,
+				// 		z: 0,
+				// 		ease: "power1.inOut",
+				// 		duration: 0.8,
+				// 	})
+				// 	.to(nearestBall.position, {
+				// 		x: 0,
+				// 		y: this.height / 2 + 5.6,
+				// 		z: 0,
+				// 		duration: 0.1, // Adjust speed
+				// 		ease: "power2.out",
+				// 	})
+				// 	.to(nearestBall.rotation, {
+				// 		duration: 1,
+				// 		ease: "linear",
+				// 		motionPath: {
+				// 			path: pathPoints,
+				// 			align: "self",
+				// 			autoRotate: true,
+				// 		},
+				// 	})
+				// 	.to(nearestBall.position, {
+				// 		y: -this.height / 2 + 0.6, // Final drop position
+				// 		duration: 1,
+				// 		ease: "bounce.out",
+				// 	});
 			},
 		});
 
