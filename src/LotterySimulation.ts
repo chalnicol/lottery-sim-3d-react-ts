@@ -40,8 +40,9 @@ export default class LotterySimulation {
 	private blinkTimer: number | undefined;
 	private timerPlanes: THREE.Mesh[] = [];
 	private totalPlanes = 30; // Number of planes
-	private fontURL: string =
-		"https://threejs.org/examples/fonts/helvetiker_bold.typeface.json";
+	// private fontURL: string =
+	// 	"https://threejs.org/examples/fonts/helvetiker_bold.typeface.json";
+	private fontURL: string = "/fonts/myFont.json";
 
 	private gamesData: Games[] = [
 		{ id: 0, label: "Lotto", value: 42, schedule: [2, 4, 6] },
@@ -51,7 +52,6 @@ export default class LotterySimulation {
 		{ id: 4, label: "Ultra Lotto", value: 58, schedule: [0, 2, 5] },
 	];
 
-	private hoveredSelect: THREE.Group | null = null;
 	private selects: THREE.Group[] = [];
 	private selectPanelGroup: THREE.Group[] = [];
 	private schedulePanelGroup: THREE.Group[] = [];
@@ -110,6 +110,7 @@ export default class LotterySimulation {
 		}, 1000);
 		setTimeout(() => {
 			this.createSchedule();
+			this.createFireworks(3);
 		}, 1500);
 	}
 
@@ -151,15 +152,15 @@ export default class LotterySimulation {
 			//create title..
 			const titleGeometry = new THREE.BoxGeometry(panelW, 1.2, 0.05);
 			const titleMaterial = new THREE.MeshBasicMaterial({
-				color: 0xffcc00,
+				color: 0xff3333,
 				transparent: true,
-				opacity: 0.5,
+				opacity: 0.7,
 				side: THREE.DoubleSide,
 			});
 			const title = new THREE.Mesh(titleGeometry, titleMaterial);
 
 			//create title text..
-			const titleTextGeometry = new TextGeometry("Lottery Schedule", {
+			const titleTextGeometry = new TextGeometry("PCSO Lotto Schedule", {
 				font,
 				size: 0.35,
 				depth: 0,
@@ -169,7 +170,7 @@ export default class LotterySimulation {
 			});
 			const titleText = new THREE.Mesh(titleTextGeometry, titleTextMaterial);
 			titleText.position.z = 0.05;
-			titleText.position.y = -0.2;
+			titleText.position.y = -0.15;
 			titleText.position.x = -panelW / 2 + 0.5;
 
 			titleGroup.add(title, titleText);
@@ -190,7 +191,7 @@ export default class LotterySimulation {
 					0.5
 				);
 				const containerMaterial = new THREE.MeshBasicMaterial({
-					color: day == i ? 0xccffe6 : 0xffffff,
+					color: day == i ? 0xb3ffff : 0xffffff,
 					transparent: true,
 					opacity: 0.7,
 					// depthWrite: false,
@@ -251,7 +252,7 @@ export default class LotterySimulation {
 						subPanelW * 0.8
 					);
 					const squareMaterial = new THREE.MeshBasicMaterial({
-						color: 0x2e2e2e,
+						color: 0x3f3f3f,
 					});
 					const square = new THREE.Mesh(squareGeometry, squareMaterial);
 					square.position.z = 0.06;
@@ -536,85 +537,269 @@ export default class LotterySimulation {
 	}
 
 	private createButtons() {
-		const button1 = new Button(1, "START DRAW", false, 0x0066ff, 0xffffff);
-		button1.setVisible(false);
+		const btnW = 4;
+		const btnH = 0.2;
+		const btnD = 1;
+
+		const button1 = new Button(
+			this.scene,
+			1,
+			"START DRAW",
+			btnW,
+			btnH,
+			btnD,
+			false,
+			0x0066ff,
+			0x3385ff,
+			0xffffff
+		);
 		button1.setPosition(
-			new THREE.Vector3(this.width / 2 + 3.5, -this.height / 2 + 0.15, 1)
+			new THREE.Vector3(
+				this.width / 2 + 3.5,
+				-this.height / 2 + 0.15,
+				this.depth / 2 - btnD / 2
+			)
 		);
 
-		const button2 = new Button(2, "RESET", false, 0xff3333, 0xffffff);
-		button2.setVisible(false);
+		const button2 = new Button(
+			this.scene,
+			2,
+			"RESET",
+			btnW,
+			btnH,
+			btnD,
+			false,
+			0xff3333,
+			0xff6666,
+			0xffffff
+		);
 		button2.setPosition(
-			new THREE.Vector3(this.width / 2 + 3.5, -this.height / 2 + 0.15, -1)
+			new THREE.Vector3(
+				this.width / 2 + 3.5,
+				-this.height / 2 + 0.15,
+				this.depth / 2 - btnD / 2 - btnD - 0.5
+			)
 		);
-
-		this.scene.add(button1.getMesh());
-		this.scene.add(button2.getMesh());
 
 		this.buttons.push(button1);
 		this.buttons.push(button2);
 	}
 
-	private createFirework(position: THREE.Vector3) {
-		const particleCount = 50;
-		const geometry = new THREE.BufferGeometry();
-		const positions = new Float32Array(particleCount * 3);
-		const velocities: THREE.Vector3[] = []; // Store velocities for movement
+	private createFireworks(fireworkCount: number = 10) {
+		let count = 0;
 
-		for (let i = 0; i < particleCount; i++) {
-			// Set initial positions at explosion center
-			positions[i * 3] = position.x;
-			positions[i * 3 + 1] = position.y;
-			positions[i * 3 + 2] = position.z;
+		//initial fireworks..
+		this.createFirework();
 
-			// Random velocities for outward explosion
-			velocities.push(
-				new THREE.Vector3(
-					(Math.random() - 0.5) * 4, // X velocity
-					Math.random() * 3 + 1, // Y velocity (stronger upward)
-					(Math.random() - 0.5) * 4 // Z velocity
-				)
+		const timer = setInterval(() => {
+			count++;
+			this.createFirework();
+			if (count === fireworkCount - 1) {
+				clearInterval(timer);
+			}
+		}, 2000);
+	}
+
+	private createFirework() {
+		const particleCount = 50; // Number of smoke particles
+
+		const startLocation = new THREE.Vector3(0, 0, this.depth / 2);
+		const endLocation = new THREE.Vector3(
+			Math.random() * 10 - 5,
+			Math.random() * 3 + 3,
+			Math.random() * 3
+		); // End location for firework
+
+		const direction = new THREE.Vector3().subVectors(
+			endLocation,
+			startLocation
+		);
+		const totalDistance = direction.length(); // Distance from start to end
+
+		const unitDirection = direction.clone().normalize();
+
+		const stepSize = totalDistance / particleCount;
+
+		const particles: THREE.Mesh[] = [];
+		for (let count = 0; count < particleCount; count++) {
+			// Small spheres for visible smoke particles
+			const geometry = new THREE.SphereGeometry(0.12, 8, 8);
+
+			const material = new THREE.MeshBasicMaterial({
+				color: 0xffccc3, // Light gray color for smoke
+				transparent: true,
+				opacity: 0.7,
+			});
+			const particle = new THREE.Mesh(geometry, material);
+
+			const step = unitDirection.clone().multiplyScalar(stepSize * count);
+			particle.position.set(
+				startLocation.x + step.x,
+				startLocation.y + step.y,
+				startLocation.z + step.z
 			);
+			this.scene.add(particle);
+			particles.push(particle);
 		}
 
-		geometry.setAttribute(
-			"position",
-			new THREE.BufferAttribute(positions, 3)
-		);
-
-		const material = new THREE.PointsMaterial({
-			color: 0xffcc00, // Firework color
-			size: 0.2,
-			transparent: true,
-			opacity: 1,
+		const tl = gsap.timeline({
+			onComplete: () => {
+				this.createExplosion(endLocation);
+				particles.forEach((particle) => {
+					(particle.material as THREE.MeshBasicMaterial).dispose();
+					particle.geometry.dispose();
+					this.scene.remove(particle);
+				});
+			},
 		});
+		tl.addLabel("init");
+		particles.forEach((particle, i) => {
+			tl.fromTo(
+				particle.scale,
+				{ x: 0, y: 0, z: 0 },
+				{
+					x: 1,
+					y: 1,
+					z: 1,
+					repeat: 1,
+					yoyo: true,
+					ease: "power3.out",
+					delay: i * 0.02,
+				},
+				"init"
+			);
+			tl.to(
+				particle.material,
+				{
+					opacity: 0,
+					ease: "power3.out",
+					duration: 1,
+					delay: i * 0.02,
+				},
+				"init"
+			);
+		});
+	}
 
-		const particles = new THREE.Points(geometry, material);
-		this.scene.add(particles);
+	// In your createExplosion method, define the particles and their velocities
+	private createExplosion(endLocation: THREE.Vector3) {
+		const particleCount = 40; // Number of explosion particles that move
+		const extraParticleCount = 15; // Number of additional particles that stay in place
+		const particleRadius = 5; // Radius of the explosion
 
-		// Animate the firework explosion
-		let lifetime = 1.5; // Firework duration
+		// Generate moving particles
+		for (let i = 0; i < particleCount; i++) {
+			const geometry = new THREE.SphereGeometry(0.1, 8, 8); // Smaller spheres for explosion
+			const material = new THREE.MeshBasicMaterial({
+				transparent: true,
+				opacity: 1,
+			});
 
-		const interval = setInterval(() => {
-			if (lifetime <= 0) {
-				this.scene.remove(particles);
-				clearInterval(interval);
-				return;
-			}
+			// Random direction within a sphere (3D explosion)
+			const direction = new THREE.Vector3(
+				Math.random() * 2 - 1,
+				Math.random() * 2 - 1,
+				Math.random() * 2 - 1
+			).normalize(); // Normalize to get a random direction
 
-			for (let i = 0; i < particleCount; i++) {
-				const index = i * 3;
-				positions[index] += velocities[i].x * 0.1; // Move X
-				positions[index + 1] += velocities[i].y * 0.1; // Move Y
-				positions[index + 2] += velocities[i].z * 0.1; // Move Z
+			const distance = Math.random() * 1 + 4;
 
-				velocities[i].y -= 0.05; // Gravity effect
-			}
+			// Random bright color for each particle
+			const hue = Math.random(); // Random hue (0 to 1)
+			const saturation = 1; // Max saturation (bright)
+			const lightness = 0.5 + Math.random() * 0.3; // Lightness between 0.5 and 0.8 for brightness
+			material.color.setHSL(hue, saturation, lightness);
 
-			particles.geometry.attributes.position.needsUpdate = true;
-			material.opacity -= 0.05; // Gradually fade out
-			lifetime -= 0.05;
-		}, 50);
+			// Set initial position at the endLocation
+			const particle = new THREE.Mesh(geometry, material);
+			particle.position.set(endLocation.x, endLocation.y, endLocation.z);
+
+			// Add particle to scene
+			this.scene.add(particle);
+
+			// Animate the particle
+			gsap.to(particle.position, {
+				x: particle.position.x + direction.x * distance,
+				y: particle.position.y + direction.y * distance,
+				z: particle.position.z + direction.z * distance,
+				duration: 1.2, // Adjust duration for faster movement
+				ease: "power4.out", // Burst of speed at first, then slows down
+			});
+			gsap.to(particle.material, {
+				opacity: 0,
+				duration: 0.5, // Fade out effect
+				delay: 0.7,
+				onComplete: () => {
+					// Dispose geometry and material to free memory
+					particle.material.dispose();
+					particle.geometry.dispose();
+					this.scene.remove(particle); // Remove from scene
+				},
+			});
+		}
+
+		// Generate extra stationary particles that don't move but fade out
+		for (let i = 0; i < extraParticleCount; i++) {
+			const geometry = new THREE.SphereGeometry(0.1, 8, 8); // Smaller spheres for explosion
+			const material = new THREE.MeshBasicMaterial({
+				transparent: true,
+				opacity: 1,
+			});
+
+			// Random position within the radius around the end location
+			const randomOffset = new THREE.Vector3(
+				Math.random() * 2 - 1,
+				Math.random() * 2 - 1,
+				Math.random() * 2 - 1
+			)
+				.normalize()
+				.multiplyScalar(Math.random() * particleRadius);
+
+			const hue = Math.random(); // Random hue (0 to 1)
+			const saturation = 1; // Max saturation (bright)
+			const lightness = 0.5 + Math.random() * 0.3; // Lightness between 0.5 and 0.8 for brightness
+			material.color.setHSL(hue, saturation, lightness);
+
+			// Set initial position at a random location within the radius
+			const particle = new THREE.Mesh(geometry, material);
+			particle.position.set(
+				endLocation.x + randomOffset.x,
+				endLocation.y + randomOffset.y,
+				endLocation.z + randomOffset.z
+			);
+
+			// Add particle to scene
+			this.scene.add(particle);
+
+			// Delay the appearance of each extra particle
+			gsap.fromTo(
+				particle.scale,
+				{
+					x: 0,
+					y: 0,
+					z: 0,
+				},
+				{
+					x: 1,
+					y: 1,
+					z: 1,
+					ease: "power3.out",
+					delay: 0.2 + i * 0.1, // Random delay for each extra particle
+				}
+			);
+			gsap.to(particle.material, {
+				opacity: 0,
+				duration: 1, // Fade out effect
+				delay: 0.2 + i * 0.1, // Random delay for each extra particle
+
+				onComplete: () => {
+					// Dispose geometry and material to free memory
+					particle.material.dispose();
+					particle.geometry.dispose();
+					this.scene.remove(particle); // Remove from scene
+				},
+			});
+		}
 	}
 
 	private createSelectGamePanel() {
@@ -626,10 +811,10 @@ export default class LotterySimulation {
 			//create main panel..
 			const panelGeometry = new THREE.BoxGeometry(5, 1, 0.1);
 			const panelMaterial = new THREE.MeshBasicMaterial({
-				color: 0xffcc00,
+				color: 0x3399ff,
 				side: THREE.DoubleSide,
 				transparent: true,
-				opacity: 0.5,
+				opacity: 0.7,
 				//depthTest: false, // Disable depth testing for selection panel to appear on top of other objects
 			}); // Black color for selection panel
 			const panel = new THREE.Mesh(panelGeometry, panelMaterial);
@@ -640,14 +825,14 @@ export default class LotterySimulation {
 				depth: 0,
 			});
 			const panelLabelMaterial = new THREE.MeshBasicMaterial({
-				color: 0xffffff,
+				color: 0xfefefe,
 			});
 			const panelLabel = new THREE.Mesh(
 				panelLabelGeometry,
 				panelLabelMaterial
 			);
 			panelLabel.position.z = 0.1;
-			panelLabel.position.y = -0.1;
+			panelLabel.position.y = -0.15;
 			panelLabel.position.x = -2;
 
 			titleGroup.add(panelLabel);
@@ -775,7 +960,6 @@ export default class LotterySimulation {
 				this.startLightingEffect();
 				this.buttons.forEach((button) => {
 					button.enable(false);
-					button.setVisible(false);
 				});
 				this.buttons[0].setLabel("START DRAW");
 				setTimeout(() => this.showSelectPanel(), 1000);
@@ -791,18 +975,17 @@ export default class LotterySimulation {
 		if (!this.selects[index]) return;
 		console.log("selectButtonClicked");
 		gsap.to(this.selects[index].scale, {
-			x: 0.9,
-			y: 0.9,
+			x: 0.95,
+			y: 0.95,
 			repeat: 1,
 			yoyo: true,
 			ease: "power4.out",
 			duration: 0.05,
 			onComplete: () => {
 				this.totalBalls = this.gamesData[index].value;
-				this.buttons[0].enable();
-
-				this.buttons[0].setVisible();
-				this.buttons[1].setVisible();
+				this.buttons.forEach((button) => {
+					button.enable(true);
+				});
 				this.resetAllBalls();
 				this.showSelectPanel(false);
 				this.showSchedule(false);
@@ -813,20 +996,9 @@ export default class LotterySimulation {
 	private selectButtonHover(index: number) {
 		if (!this.selects[index]) return;
 
-		if (this.hoveredSelect !== this.selects[index]) {
-			const hoveredChild = this.hoveredSelect?.children[0] as THREE.Mesh;
-			if (hoveredChild && hoveredChild.material) {
-				(hoveredChild.material as THREE.MeshBasicMaterial).color.set(
-					0xffffff
-				);
-			}
-		}
-
-		this.hoveredSelect = this.selects[index];
-		// Add your logic to handle button click event here
-		const firstChild = this.selects[index]?.children[0] as THREE.Mesh;
-		if (firstChild && firstChild.material) {
-			(firstChild.material as THREE.MeshBasicMaterial).color.set(0xccffe6);
+		const hoveredMesh = this.selects[index].children[0] as THREE.Mesh;
+		if (hoveredMesh && hoveredMesh.material) {
+			(hoveredMesh.material as THREE.MeshBasicMaterial).color.set(0xb3ffff);
 		}
 	}
 
@@ -971,9 +1143,9 @@ export default class LotterySimulation {
 		const pointB = new THREE.Vector3(
 			drawnXPosition,
 			this.height / 2 + 2.6,
-			this.depth / 2 + 2.5
+			this.depth / 2 + 2.8
 		);
-		const pathPoints = this.createJumpPath(pointA, pointB, 3);
+		const pathPoints = this.createJumpPath(pointA, pointB, 2);
 
 		gsap.to(nearestBall.position, {
 			x: 0,
@@ -982,7 +1154,18 @@ export default class LotterySimulation {
 			duration: 0.3,
 			ease: "power4.out",
 			onComplete: () => {
-				const tl = gsap.timeline({ delay: 0.5 });
+				const tl = gsap.timeline({
+					delay: 0.5,
+					onComplete: () => {
+						gsap.to(nearestBall.rotation, {
+							x: -0.7,
+							y: 0,
+							z: 0,
+							ease: "power4.out",
+							duration: 0.2,
+						});
+					},
+				});
 
 				tl.addLabel("main")
 
@@ -993,8 +1176,8 @@ export default class LotterySimulation {
 							x: 0,
 							y: "+=2",
 							z: 0,
-							ease: "power2.inOut", // Smooth acceleration
-							duration: 0.25, // Slightly longer for natural lift
+							ease: "power4.inOut", // Smooth acceleration
+							duration: 0.2, // Slightly longer for natural lift
 						},
 						"main"
 					)
@@ -1003,11 +1186,15 @@ export default class LotterySimulation {
 					.to(
 						nearestBall.rotation,
 						{
-							x: -0.7,
-							y: 0,
-							z: 0,
+							// x: "+=" + (Math.random() * 50 - 25),
+							// y: "+=" + (Math.random() * 50 - 25),
+							// z: "+=" + (Math.random() * 50 - 25),
+							x: "+=30",
+							y: "+=" + (Math.random() * 30 - 15),
+							z: "+=" + (Math.random() * 30 - 15),
+
 							ease: "linear",
-							duration: 1, // Syncs better with the arc
+							duration: 1.3, // Syncs better with the arc
 						},
 						"main"
 					)
@@ -1016,7 +1203,7 @@ export default class LotterySimulation {
 					.to(
 						nearestBall.position,
 						{
-							duration: 0.3, // Longer for a better motion arc
+							duration: 0.8, // Longer for a better motion arc
 							ease: "linear", // More natural easing for arc motion
 							motionPath: {
 								path: pathPoints,
@@ -1031,10 +1218,10 @@ export default class LotterySimulation {
 						nearestBall.position,
 						{
 							y: -this.height / 2 + 0.6, // Final landing position
-							duration: 0.7, // Keeps it balanced
+							duration: 0.4, // Keeps it balanced
 							ease: "bounce.out", // Natural bounce effect
 						},
-						"main+=0.35" // Starts right after the jump path finishes
+						"main+=0.9" // Starts right after the jump path finishes
 					);
 
 				// const timeline = gsap.timeline();
@@ -1103,6 +1290,7 @@ export default class LotterySimulation {
 
 		this.buttons[0].setLabel("DRAW AGAIN");
 		this.blinkTimerPlanes();
+		this.createFireworks();
 	}
 
 	private resetAllBalls() {
@@ -1160,6 +1348,8 @@ export default class LotterySimulation {
 	}
 
 	private onMouseClick = (event: MouseEvent) => {
+		//console.log("e", event);
+
 		this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
 		this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
@@ -1212,6 +1402,11 @@ export default class LotterySimulation {
 			true
 		);
 
+		const buttonIntersects = this.raycaster.intersectObjects(
+			this.buttons.map((btn) => btn.getMesh()),
+			true
+		);
+
 		if (selectIntersects.length > 0) {
 			const clickedSelect = selectIntersects[0].object.parent as THREE.Group; // Ensure it's a group
 			const clickedSelectIndex = this.selects.findIndex(
@@ -1220,24 +1415,37 @@ export default class LotterySimulation {
 			if (clickedSelectIndex !== -1) {
 				// console.log("Clicked Select Index:", clickedSelectIndex);
 				this.selectButtonHover(clickedSelectIndex);
-			} else {
-				//..
 			}
 			return;
+		} else if (buttonIntersects.length > 0) {
+			//..
+			const hoveredButton = buttonIntersects[0].object.parent as THREE.Group; // Ensure it's a group
+			const hoveredButtonIndex = this.buttons.findIndex(
+				(btn) => btn.getMesh() === hoveredButton
+			);
+			this.buttons[hoveredButtonIndex].onHover();
+			return;
 		} else {
-			if (this.hoveredSelect) {
-				const hoveredChild = this.hoveredSelect?.children[0] as THREE.Mesh;
-				if (hoveredChild && hoveredChild.material) {
-					(hoveredChild.material as THREE.MeshBasicMaterial).color.set(
-						0xffffff
-					);
-				}
-				this.hoveredSelect = null;
-			}
+			this.resetSelects();
+			this.resetButtons();
 		}
 	};
 
-	// Reset function to restore default appearance
+	private resetButtons() {
+		this.buttons.forEach((button) => {
+			button.reset();
+		});
+	}
+	private resetSelects() {
+		this.selects.forEach((select) => {
+			const selectMesh = select.children[0] as THREE.Mesh;
+			if (selectMesh && selectMesh.material) {
+				(selectMesh.material as THREE.MeshBasicMaterial).color.set(
+					0xffffff
+				);
+			}
+		});
+	}
 
 	private setupEventListeners() {
 		window.addEventListener("resize", () => {

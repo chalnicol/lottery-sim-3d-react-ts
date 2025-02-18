@@ -7,30 +7,54 @@ export default class Button {
 	private label: string;
 	private color: number;
 	private textColor: number;
-	private mesh: THREE.Group;
+	private hoverColor: number;
 	private enabled: boolean;
+	private width: number;
+	private height: number;
+	private depth: number;
+	private scene: THREE.Scene;
+	private mesh: THREE.Group;
+
 	constructor(
+		scene: THREE.Scene,
 		id: number,
 		label: string,
+		width: number,
+		height: number,
+		depth: number,
 		enabled: boolean = true,
 		color: number = 0xffffff,
+		hoverColor: number = 0xf3f3f3,
 		textColor: number = 0x000000
 	) {
+		this.scene = scene;
 		this.id = id;
 		this.label = label;
+		this.width = width;
+		this.height = height;
+		this.depth = depth;
 		this.color = color;
+		this.hoverColor = hoverColor;
 		this.textColor = textColor;
 		this.enabled = enabled;
 
-		//create
 		this.mesh = new THREE.Group();
-		this.createButton();
+		this.scene.add(this.mesh);
+
+		//create
+		this.createMesh();
 		this.createLabel();
 	}
 
-	createButton() {
+	createMesh() {
 		// Create button geometry & material
-		const buttonGeometry = new THREE.BoxGeometry(4, 0.3, 1);
+		// const buttonGeometry = new THREE.BoxGeometry(4, 0.3, 1);
+		const buttonGeometry = new THREE.BoxGeometry(
+			this.width,
+			this.height,
+			this.depth
+		);
+
 		const buttonMaterial = new THREE.MeshBasicMaterial({
 			color: this.enabled ? this.color : 0x9c9c9c,
 		});
@@ -39,8 +63,7 @@ export default class Button {
 	}
 
 	createLabel(): void {
-		const fontURL: string =
-			"https://threejs.org/examples/fonts/helvetiker_bold.typeface.json";
+		const fontURL: string = "/fonts/myFont.json";
 
 		new FontLoader().load(fontURL, (font) => {
 			this.createText(font);
@@ -51,7 +74,7 @@ export default class Button {
 		const labelGeometry = new TextGeometry(this.label, {
 			font,
 			size: 0.3,
-			depth: 0.05,
+			depth: 0,
 		});
 		const labelMaterial = new THREE.MeshBasicMaterial({
 			color: this.textColor,
@@ -63,7 +86,7 @@ export default class Button {
 			const centerOffset =
 				-0.5 *
 				(labelGeometry.boundingBox.max.x - labelGeometry.boundingBox.min.x);
-			label.position.set(centerOffset, 0.16, 0.1);
+			label.position.set(centerOffset, 0.11, 0.1);
 		}
 		label.rotation.x = -Math.PI / 2;
 
@@ -106,11 +129,15 @@ export default class Button {
 		this.mesh.visible = visible;
 	}
 
-	onClick() {
-		if (!this.enabled) return;
+	setColor(color: number): void {
+		const buttonMesh = this.mesh.children[0] as THREE.Mesh;
+		if (buttonMesh.material instanceof THREE.MeshBasicMaterial) {
+			buttonMesh.material.color.set(color);
+		}
+	}
 
-		// const buttonMesh = this.mesh.children[0] as THREE.Mesh;
-		// const buttonMaterial = buttonMesh.material as THREE.MeshBasicMaterial;
+	onClick(): void {
+		if (!this.enabled) return;
 
 		gsap.to(this.mesh.position, {
 			y: "-=0.1",
@@ -118,15 +145,14 @@ export default class Button {
 			yoyo: true,
 			repeat: 1,
 			ease: "power1.inOut",
-		}); // Shrink effect
-		// gsap.to(buttonMaterial.color, {
-		// 	r: 1,
-		// 	g: 0,
-		// 	b: 0,
-		// 	duration: 0.2,
-		// 	yoyo: true,
-		// 	repeat: 1,
-		// 	ease: "power1.inOut",
-		// }); // Flash red
+		});
+	}
+	onHover(): void {
+		if (!this.enabled) return;
+		this.setColor(this.hoverColor);
+	}
+	reset(): void {
+		if (!this.enabled) return;
+		this.setColor(this.color);
 	}
 }
